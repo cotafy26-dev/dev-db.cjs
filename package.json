@@ -1,0 +1,24 @@
+{
+  "name": "hermes-ia",
+  "version": "0.1.0",
+  "private": true,
+  "description": "HERMES IA - Assistente inteligente de gestao empresarial (SaaS multi-tenant)",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace backend & npm run dev --workspace frontend",
+    "dev:backend": "npm run dev --workspace backend",
+    "dev:frontend": "npm run dev --workspace frontend",
+    "build": "npm run build --workspace backend && npm run build --workspace frontend",
+    "test": "npm run test --workspace backend",
+    "db:migrate": "npm run db:migrate --workspace backend",
+    "db:seed": "npm run db:seed --workspace backend",
+    "db:studio": "npm run db:studio --workspace backend",
+    "lint": "npm run lint --workspace backend"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
