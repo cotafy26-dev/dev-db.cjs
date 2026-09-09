@@ -78,13 +78,36 @@ function detect(text: string): ChatToolCall[] {
   return [];
 }
 
+const brl = (v: unknown) => `R$ ${Number(v ?? 0).toFixed(2).replace('.', ',')}`;
+
 function summarize(toolName: string, result: unknown): string {
   const r = (result ?? {}) as Record<string, unknown>;
   if (r.error) return `Nao consegui: ${String(r.error)}`;
   if (r.needsClarification) return String(r.question);
   if (r.needsConfirmation) return String(r.prompt);
   if (typeof r.message === 'string') return r.message;
-  return `Feito. ${JSON.stringify(result).slice(0, 400)}`;
+
+  switch (toolName) {
+    case 'sales_summary':
+      return `Vendas ${r.period ?? 'hoje'}: ${r.count} venda(s), total ${brl(r.gross)} (recebido ${brl(r.received)}, a receber ${brl(r.pending)}).`;
+    case 'get_profit_report':
+      return `Lucro estimado (${r.period ?? 'mes'}): ${brl(r.estimatedProfit)}. Receita ${brl(r.revenue)} - custo ${brl(r.cogs)} - despesas ${brl(r.otherExpenses)}.`;
+    case 'get_today_appointments':
+    case 'list_appointments':
+    case 'get_upcoming_appointments': {
+      const list = (r.appointments as { title: string; when: string }[]) ?? [];
+      return list.length
+        ? list.map((a) => `- ${a.title} (${new Date(a.when).toLocaleString('pt-BR')})`).join('\n')
+        : 'Nenhum compromisso.';
+    }
+    case 'get_overdue_accounts': {
+      const rec = (r.receivables as unknown[])?.length ?? 0;
+      const pay = (r.payables as unknown[])?.length ?? 0;
+      return `Vencidos: ${rec} conta(s) a receber e ${pay} a pagar.`;
+    }
+    default:
+      return 'Feito.';
+  }
 }
 
 export class StubProvider implements AIProvider {

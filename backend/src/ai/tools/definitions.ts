@@ -380,7 +380,14 @@ const tools: HermesTool[] = [
     async handler(a) {
       const r = periodRange(a.period);
       const s = await sales.salesSummary({ from: r.from, to: r.to });
-      return { period: r.label, count: s.count, gross: s.gross, received: s.received, pending: s.pending };
+      return {
+        period: r.label,
+        count: s.count,
+        gross: s.gross,
+        received: s.received,
+        pending: s.pending,
+        message: `Vendas ${r.label}: ${s.count} venda(s), total ${formatBRL(s.gross)} (recebido ${formatBRL(s.received)}, a receber ${formatBRL(s.pending)}).`,
+      };
     },
   }),
 
