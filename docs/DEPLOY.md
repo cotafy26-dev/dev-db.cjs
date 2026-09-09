@@ -44,25 +44,30 @@ npm run build
 
 ---
 
-## 2. Backend — Caminho A: hosting com "Setup Node.js App"
+## 2. Backend — Caminho A: hosting com "Node.js App" (Hostinger Web Apps, cPanel, Plesk)
 
-(Hostinger Business/Premium, cPanel + Passenger, Plesk…)
+O backend roda **TypeScript direto via `tsx`** — **não há passo de `tsc`**. O host só
+precisa de `npm install` + `npm start`.
 
-1. **Node 20+**, application root = a pasta do repo, **startup file** = `backend/dist/server.js`.
-2. **Build** (no terminal SSH do hosting, ou no build hook):
-   ```bash
-   npm ci
-   npm run db:generate
-   npm run build --workspace backend
-   npm run db:deploy
-   ```
-3. **Variáveis de ambiente** (painel do hosting) — ver [tabela abaixo](#variáveis-de-ambiente).
-   O Passenger injeta `PORT` automaticamente; o servidor respeita.
-4. Subdomínio sugerido: `api.seudominio.com` → apontando para o app Node.
-5. **Reiniciar** o app pelo painel.
-6. Teste: `curl https://api.seudominio.com/api/health` → `{"status":"ok","db":"up"}`.
+| Campo | Valor |
+|-------|-------|
+| Package manager | **npm** |
+| Diretório raiz | `./` (raiz do repo) |
+| Comando de instalação | `npm install` |
+| Comando de compilação (build) | `npm run build --workspace backend`  *(só roda `prisma generate`)* |
+| Comando de início (start) | `npm run start --workspace backend`  *(= `tsx src/server.ts`)* |
+| Diretório de saída / publicação | **vazio** — é app Node, não site estático |
+| Node | 20.x |
 
-> Se o painel não tiver "Node.js App", use o **Caminho B**.
+1. **Variáveis de ambiente** (painel) — ver [tabela abaixo](#variáveis-de-ambiente).
+   O host injeta `PORT`; o servidor respeita `env.PORT`.
+2. Migrations: o banco (Supabase) já é migrado com `npm run db:deploy` **uma vez** (local
+   ou via console do host). Não precisa rodar no start.
+3. **Reimplantar** / reiniciar o app.
+4. Teste: `https://SEU-APP/api/health` → `{"status":"ok","db":"up"}`.
+
+> Se o build do host pular as devDependencies (`NODE_ENV=production`), tudo bem: com
+> `tsx` runtime **não é preciso** `typescript` nem `@types/*` para rodar.
 
 ---
 
@@ -73,8 +78,8 @@ npm run build
 1. New → **Blueprint** → aponta para o repo. O [`render.yaml`](../render.yaml) cria
    `hermes-api` (Node) + `hermes-web` (estático).
    *Ou* manualmente: New → Web Service → repo → runtime Node
-   - Build: `npm ci && npm run db:generate && npm run build --workspace backend`
-   - Start: `npm run db:deploy && npm start`
+   - Build: `npm ci && npm run build --workspace backend`
+   - Start: `npm run db:deploy --workspace backend && npm run start --workspace backend`
    - Health check: `/api/health`
 2. Preencha as variáveis (ver tabela).
 3. O `Procfile` também funciona em Railway/Heroku (`release` roda migrations, `web` sobe).
@@ -159,8 +164,8 @@ Nunca versione `.env`. Chaves reais só no painel do hosting / PaaS.
 ```bash
 git pull
 npm ci
-# backend:
-npm run build --workspace backend && npm run db:deploy   # (reiniciar o app)
+# backend: (sem tsc - roda com tsx)
+npm run db:deploy --workspace backend   # só se houver migration nova; reiniciar o app
 # frontend:
 VITE_API_URL=https://api.seudominio.com npm run build --workspace frontend   # (subir dist/)
 ```

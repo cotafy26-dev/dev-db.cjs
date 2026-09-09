@@ -1,2 +1,2 @@
-release: npm run db:deploy
-web: npm start
+release: npm run db:deploy --workspace backend
+web: npm run start --workspace backend

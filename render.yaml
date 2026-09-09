@@ -6,8 +6,8 @@ services:
     name: hermes-api
     runtime: node
     plan: free
-    buildCommand: npm ci && npm run db:generate && npm run build --workspace backend
-    startCommand: npm run db:deploy && npm start
+    buildCommand: npm ci && npm run build --workspace backend
+    startCommand: npm run db:deploy --workspace backend && npm run start --workspace backend
     healthCheckPath: /api/health
     envVars:
       - key: NODE_ENV
