@@ -7,6 +7,6 @@ export {
   toolsForCurrentRole,
   NeedsClarification,
   NeedsConfirmation,
-  type HermesTool,
+  type AiTool,
   type ToolExecution,
 } from './registry';

@@ -21,7 +21,7 @@ export const useAuth = create<AuthState>()(
       setUser: (user) => set({ user }),
       clear: () => set({ user: null, tokens: null }),
     }),
-    { name: 'hermes.auth' },
+    { name: 'tato.auth' },
   ),
 );
 

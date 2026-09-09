@@ -67,7 +67,7 @@ const parsed = schema.safeParse(process.env);
 if (!parsed.success) {
   const issues = parsed.error.issues.map((i) => `  - ${i.path.join('.')}: ${i.message}`).join('\n');
   // eslint-disable-next-line no-console
-  console.error(`\n[HERMES IA] Configuracao de ambiente invalida:\n${issues}\n`);
+  console.error(`\n[Tato] Configuracao de ambiente invalida:\n${issues}\n`);
   process.exit(1);
 }
 

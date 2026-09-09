@@ -20,7 +20,7 @@ const SUGESTOES = [
 export function AssistantPage() {
   const qc = useQueryClient();
   const [messages, setMessages] = useState<Msg[]>([
-    { role: 'assistant', content: 'Olá! Sou o HERMES. Peça em linguagem natural: vendas, despesas, cobranças, estoque, agenda...' },
+    { role: 'assistant', content: 'Olá! Sou o Tato. Peça em linguagem natural: vendas, despesas, cobranças, estoque, agenda...' },
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -79,7 +79,7 @@ export function AssistantPage() {
               </div>
             </div>
           ))}
-          {loading && <div className="text-sm text-slate-400">HERMES está pensando...</div>}
+          {loading && <div className="text-sm text-slate-400">Tato está pensando...</div>}
           <div ref={endRef} />
         </div>
 

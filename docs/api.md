@@ -1,4 +1,4 @@
-# API REST — HERMES IA
+# API REST — Tato
 
 Base: `/api`. Auth: `Authorization: Bearer <accessToken>` (exceto `/auth/*` e `/webhooks/*`).
 Respostas: `{ "data": ... }` ou `{ "data": [...], "meta": { page, pageSize, total, pages } }`.

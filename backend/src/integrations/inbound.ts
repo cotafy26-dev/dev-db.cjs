@@ -55,7 +55,7 @@ async function runCommand(cmd: string, company: { name: string }): Promise<strin
 
 /**
  * Ponto de entrada unico para mensagens de qualquer canal externo (secao 21/22).
- * Resolve o tenant pelo vinculo do canal, estabelece o contexto e delega ao Hermes.
+ * Resolve o tenant pelo vinculo do canal, estabelece o contexto e delega ao Tato.
  */
 export async function handleInboundMessage(params: {
   channel: ChannelType;

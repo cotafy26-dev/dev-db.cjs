@@ -21,7 +21,7 @@ const PERMISSIONS: Record<string, string> = {
   'report.read': 'Ver relatorios', 'report.finance.read': 'Ver relatorios financeiros',
   'automation.read': 'Ver automacoes', 'automation.manage': 'Gerenciar automacoes',
   'integration.read': 'Ver integracoes', 'integration.manage': 'Gerenciar integracoes',
-  'notification.read': 'Ver notificacoes', 'audit.read': 'Ver auditoria', 'ai.use': 'Usar Hermes', 'lgpd.manage': 'Gerenciar LGPD',
+  'notification.read': 'Ver notificacoes', 'audit.read': 'Ver auditoria', 'ai.use': 'Usar Tato', 'lgpd.manage': 'Gerenciar LGPD',
 };
 
 const MATRIX: Record<string, string[]> = {
@@ -59,7 +59,7 @@ async function main() {
 
   const company = await prisma.company.create({
     data: {
-      name: 'Loja Demo HERMES',
+      name: 'Loja Demo Tato',
       segment: 'Varejo',
       document: '00.000.000/0001-00',
       phone: '(11) 90000-0000',

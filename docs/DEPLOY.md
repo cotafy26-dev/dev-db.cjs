@@ -1,6 +1,6 @@
-# Deploy — HERMES IA (sem VPS)
+# Deploy — Tato (sem VPS)
 
-O HERMES tem **3 peças**:
+O Tato tem **3 peças**:
 
 | Peça | O que é | Onde hospedar |
 |------|---------|---------------|
@@ -9,7 +9,7 @@ O HERMES tem **3 peças**:
 | **Backend** | Node/Express (API + IA + bot + scheduler) | Hosting com **"Setup Node.js App"** *ou* PaaS (Render/Railway/Fly/Koyeb) |
 
 > O frontend estático **não** contém regra de negócio — tudo passa pela API. Diferente
-> do padrão "só Supabase": o HERMES precisa de um runtime Node rodando em algum lugar.
+> do padrão "só Supabase": o Tato precisa de um runtime Node rodando em algum lugar.
 
 ---
 

@@ -1,4 +1,4 @@
-# Arquitetura — HERMES IA
+# Arquitetura — Tato
 
 Monorepo npm workspaces: `backend` + `frontend`.
 

@@ -23,7 +23,7 @@ export class NeedsConfirmation extends Error {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export interface HermesTool<T extends z.ZodTypeAny = any> {
+export interface AiTool<T extends z.ZodTypeAny = any> {
   name: string;
   description: string;
   /** Permissao exigida (secao 17: autorizacao). undefined = qualquer usuario autenticado. */
@@ -34,22 +34,22 @@ export interface HermesTool<T extends z.ZodTypeAny = any> {
   handler: (args: z.infer<T>) => Promise<unknown>;
 }
 
-export function defineTool<T extends z.ZodTypeAny>(t: HermesTool<T>): HermesTool<T> {
+export function defineTool<T extends z.ZodTypeAny>(t: AiTool<T>): AiTool<T> {
   return t;
 }
 
-const registry = new Map<string, HermesTool>();
+const registry = new Map<string, AiTool>();
 
-export function registerTools(list: HermesTool[]): void {
+export function registerTools(list: AiTool[]): void {
   for (const t of list) registry.set(t.name, t);
 }
 
-export function allTools(): HermesTool[] {
+export function allTools(): AiTool[] {
   return [...registry.values()];
 }
 
 /** Ferramentas disponiveis para o perfil atual (secao 30: sem chamadas nao autorizadas). */
-export function toolsForCurrentRole(): HermesTool[] {
+export function toolsForCurrentRole(): AiTool[] {
   const role = currentRole();
   return allTools().filter((t) => !t.permission || (role ? roleHas(role, t.permission) : false));
 }

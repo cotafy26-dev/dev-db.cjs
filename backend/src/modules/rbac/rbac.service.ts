@@ -51,7 +51,7 @@ const PERMISSION_DESCRIPTIONS: Record<string, string> = {
   'integration.manage': 'Gerenciar integracoes',
   'notification.read': 'Ver notificacoes',
   'audit.read': 'Ver auditoria',
-  'ai.use': 'Usar o assistente Hermes',
+  'ai.use': 'Usar o assistente Tato',
   'lgpd.manage': 'Gerenciar solicitacoes LGPD',
 };
 

@@ -1,4 +1,4 @@
-// HERMES IA - schema do banco (PostgreSQL)
+// Tato - schema do banco (PostgreSQL)
 // Multi-tenant: toda entidade de negocio carrega companyId (secao 5).
 // A IA NUNCA acessa este banco diretamente - somente via services/tools do backend.
 // Perfis e permissoes validados no backend (secao 6).

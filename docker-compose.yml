@@ -1,4 +1,4 @@
-# HERMES IA - stack completa (secao 34).
+# Tato - stack completa (secao 34).
 #   docker compose up --build
 # Frontend: http://localhost:8080   API: http://localhost:3333
 
@@ -6,15 +6,15 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: hermes
-      POSTGRES_PASSWORD: hermes
-      POSTGRES_DB: hermes
+      POSTGRES_USER: tato
+      POSTGRES_PASSWORD: tato
+      POSTGRES_DB: tato
     ports:
       - '5432:5432'
     volumes:
-      - hermes_pg:/var/lib/postgresql/data
+      - tato_pg:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U hermes']
+      test: ['CMD-SHELL', 'pg_isready -U tato']
       interval: 5s
       timeout: 5s
       retries: 10
@@ -35,7 +35,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3333
-      DATABASE_URL: postgresql://hermes:hermes@db:5432/hermes?schema=public
+      DATABASE_URL: postgresql://tato:tato@db:5432/tato?schema=public
       WEB_ORIGIN: http://localhost:8080
       APP_URL: http://localhost:8080
       API_URL: http://localhost:3333
@@ -67,4 +67,4 @@ services:
       - '8080:80'
 
 volumes:
-  hermes_pg:
+  tato_pg:

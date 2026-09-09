@@ -19,7 +19,7 @@ export const useTheme = create<ThemeState>()(
       toggle: () => set({ mode: get().mode === 'dark' ? 'light' : 'dark' }),
       set: (m) => set({ mode: m }),
     }),
-    { name: 'hermes.theme' },
+    { name: 'tato.theme' },
   ),
 );
 

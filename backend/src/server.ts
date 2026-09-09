@@ -8,7 +8,7 @@ import { startScheduler, stopScheduler } from './core/scheduler';
 
 // Log cru no stdout - garante visibilidade nos logs do host mesmo se o pino falhar.
 // eslint-disable-next-line no-console
-const raw = (m: string) => console.log(`[hermes] ${m}`);
+const raw = (m: string) => console.log(`[tato] ${m}`);
 
 async function main(): Promise<void> {
   const app = createApp();
@@ -16,7 +16,7 @@ async function main(): Promise<void> {
   // 1) Sobe o listener IMEDIATAMENTE (o proxy do host precisa da porta de pe).
   const server = app.listen(env.PORT, env.HOST, () => {
     raw(`ouvindo em ${env.HOST}:${env.PORT}  [${env.NODE_ENV}]`);
-    logger.info(`HERMES IA API on ${env.HOST}:${env.PORT}  [${env.NODE_ENV}]`);
+    logger.info(`Tato API on ${env.HOST}:${env.PORT}  [${env.NODE_ENV}]`);
   });
   server.on('error', (err) => {
     raw(`ERRO no listener: ${(err as Error).message}`);

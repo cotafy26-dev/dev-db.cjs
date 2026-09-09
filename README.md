@@ -1,4 +1,4 @@
-# HERMES IA
+# Tato
 
 Assistente inteligente de **gestão empresarial por conversa**. O usuário administra
 vendas, clientes, produtos, estoque, financeiro, agenda, cobranças, relatórios e
@@ -38,7 +38,7 @@ uma operação **depois** que a ferramenta retorna sucesso. Operações destruti
 confirmação explícita do usuário.
 
 ```
-Usuário → WhatsApp/Telegram/Web → Webhook/API → HERMES Orchestrator
+Usuário → WhatsApp/Telegram/Web → Webhook/API → Tato Orchestrator
   → Modelo (function calling) → validação + autorização → Tool → Service → PostgreSQL
   → resultado → Modelo → resposta ao usuário   (+ AIExecution + AuditLog)
 ```

@@ -3,7 +3,7 @@
 
 services:
   - type: web
-    name: hermes-api
+    name: tato-api
     runtime: node
     plan: free
     buildCommand: npm ci && npm run build --workspace backend
@@ -34,18 +34,18 @@ services:
         sync: false
       - key: TELEGRAM_MODE
         value: webhook
-      - key: TELEGRAM_WEBHOOK_URL  # a URL deste servico (ex.: https://hermes-api.onrender.com)
+      - key: TELEGRAM_WEBHOOK_URL  # a URL deste servico (ex.: https://tato-api.onrender.com)
         sync: false
       - key: CRON_SECRET
         generateValue: true
 
   - type: web
-    name: hermes-web
+    name: tato-web
     runtime: static
     buildCommand: npm ci && npm run build --workspace frontend
     staticPublishPath: frontend/dist
     envVars:
-      - key: VITE_API_URL          # URL do hermes-api
+      - key: VITE_API_URL          # URL do tato-api
         sync: false
     routes:
       - type: rewrite

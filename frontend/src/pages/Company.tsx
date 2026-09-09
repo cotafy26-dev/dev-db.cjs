@@ -55,7 +55,7 @@ export function CompanyPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'hermes-dados-empresa.json';
+    a.download = 'tato-dados-empresa.json';
     a.click();
     URL.revokeObjectURL(url);
   };

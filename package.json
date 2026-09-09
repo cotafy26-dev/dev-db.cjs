@@ -1,8 +1,8 @@
 {
-  "name": "hermes-ia",
+  "name": "tato",
   "version": "0.2.0",
   "private": true,
-  "description": "HERMES IA - Assistente inteligente de gestao empresarial (SaaS multi-tenant)",
+  "description": "Tato - Assistente inteligente de gestao empresarial (SaaS multi-tenant)",
   "workspaces": [
     "backend",
     "frontend"

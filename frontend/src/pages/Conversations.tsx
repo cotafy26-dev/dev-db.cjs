@@ -20,7 +20,7 @@ export function ConversationsPage() {
 
   return (
     <div>
-      <PageHeader title="Conversas IA" subtitle="Histórico e diagnóstico do Hermes (AIExecution)" />
+      <PageHeader title="Conversas IA" subtitle="Histórico e diagnóstico do Tato (AIExecution)" />
       <div className="mb-4 flex gap-2">
         {(['conversas', 'execucoes'] as const).map((t) => (
           <button

@@ -1,5 +1,5 @@
 import { formatBRL } from '../../core/money';
-import { defineTool, NeedsClarification, registerTools, z, type HermesTool } from './registry';
+import { defineTool, NeedsClarification, registerTools, z, type AiTool } from './registry';
 import { parseDateOnly, parseWhen, periodRange, resolveCustomerId, resolveProduct } from './helpers';
 
 import * as customers from '../../modules/customers/customers.service';
@@ -16,7 +16,7 @@ import { sendToLinkedChannel } from '../../integrations/outbound';
 const method = z.enum(['CASH', 'PIX', 'DEBIT', 'CREDIT', 'BOLETO', 'TRANSFER', 'OTHER']);
 const confirm = z.boolean().optional().describe('Passe true apos o usuario confirmar a operacao');
 
-const tools: HermesTool[] = [
+const tools: AiTool[] = [
   // ============================================================ CLIENTES
   defineTool({
     name: 'create_customer',

@@ -3,25 +3,25 @@
 #
 # Uso:
 #   docker compose -f docker/docker-compose.yml up -d
-#   DATABASE_URL=postgresql://hermes:hermes@localhost:5432/hermes?schema=public
+#   DATABASE_URL=postgresql://tato:tato@localhost:5432/tato?schema=public
 
 services:
   db:
     image: postgres:16-alpine
-    container_name: hermes-db
+    container_name: tato-db
     environment:
-      POSTGRES_USER: hermes
-      POSTGRES_PASSWORD: hermes
-      POSTGRES_DB: hermes
+      POSTGRES_USER: tato
+      POSTGRES_PASSWORD: tato
+      POSTGRES_DB: tato
     ports:
       - '5432:5432'
     volumes:
-      - hermes_pg:/var/lib/postgresql/data
+      - tato_pg:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U hermes']
+      test: ['CMD-SHELL', 'pg_isready -U tato']
       interval: 5s
       timeout: 5s
       retries: 10
 
 volumes:
-  hermes_pg:
+  tato_pg:

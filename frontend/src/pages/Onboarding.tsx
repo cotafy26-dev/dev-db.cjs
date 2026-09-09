@@ -87,7 +87,7 @@ export function OnboardingPage() {
           {step === 3 && (
             <>
               <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Tudo pronto! 🎉</h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400">Comece conversando com o Hermes: “quanto vendi hoje?”, “paguei 120 de energia”.</p>
+              <p className="text-sm text-slate-500 dark:text-slate-400">Comece conversando com o Tato: “quanto vendi hoje?”, “paguei 120 de energia”.</p>
             </>
           )}
 

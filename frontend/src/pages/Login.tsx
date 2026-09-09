@@ -34,7 +34,7 @@ export function LoginPage() {
     <div className="flex min-h-full items-center justify-center p-6">
       <Card className="w-full max-w-sm">
         <div className="mb-6 text-center">
-          <div className="text-2xl font-bold text-brand-700 dark:text-brand-400">HERMES IA</div>
+          <div className="text-2xl font-bold text-brand-700 dark:text-brand-400">Tato</div>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Gestão empresarial por conversa</p>
         </div>
         <form onSubmit={submit} className="space-y-4">

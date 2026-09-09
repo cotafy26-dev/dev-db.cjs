@@ -12,13 +12,13 @@ export interface PromptContext {
   memory?: Record<string, unknown> | null | undefined;
 }
 
-/** System prompt interno do Hermes (secao 29). A mensagem do usuario nunca o altera (secao 30). */
+/** System prompt interno do Tato (secao 29). A mensagem do usuario nunca o altera (secao 30). */
 export function buildSystemPrompt(ctx: PromptContext): string {
   const tz = ctx.timezone ?? DEFAULT_TZ;
   const now = dayjs().tz(tz);
 
   const lines = [
-    'Voce e Hermes, assistente inteligente de gestao empresarial.',
+    'Voce e Tato, assistente inteligente de gestao empresarial.',
     'Sua funcao e ajudar o usuario a administrar a empresa atraves de linguagem natural.',
     '',
     'Voce deve:',

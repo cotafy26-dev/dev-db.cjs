@@ -84,7 +84,7 @@ export function AppLayout() {
       >
         <div className="flex items-center justify-between px-5 py-5">
           <div>
-            <div className="text-lg font-bold text-brand-700 dark:text-brand-400">HERMES IA</div>
+            <div className="text-lg font-bold text-brand-700 dark:text-brand-400">Tato</div>
             <div className="mt-0.5 truncate text-xs text-slate-400">{user?.companyName}</div>
           </div>
           <button onClick={() => setOpen(false)} className="text-slate-400 lg:hidden">
