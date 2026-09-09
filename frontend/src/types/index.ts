@@ -1,10 +1,16 @@
+export type Role = 'ADMIN' | 'MANAGER' | 'SELLER' | 'FINANCE';
+
 export interface SessionUser {
   id: string;
   name: string;
   email: string;
-  role: 'OWNER' | 'ADMIN' | 'STAFF';
+  role: Role;
   companyId: string;
   companyName: string;
+  segment?: string | null;
+  currency?: string;
+  timezone?: string;
+  onboarded?: boolean;
 }
 
 export interface AuthTokens {

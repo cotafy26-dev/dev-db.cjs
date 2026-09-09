@@ -1,109 +1,104 @@
 # Arquitetura — HERMES IA
 
-## Visão geral
+Monorepo npm workspaces: `backend` + `frontend`.
 
-Monorepo com dois pacotes (`backend`, `frontend`) via npm workspaces.
+## Camadas (backend)
 
-O backend é dividido em camadas:
+- **core/** — infra transversal: `env` (Zod), `logger` (pino), `prisma` (com *tenant
+  guard* via `$extends`), `context` (`AsyncLocalStorage`), `permissions` (matriz RBAC),
+  `audit`, `scheduler`, `money` (`Prisma.Decimal`), `dates` (parser PT-BR de datas
+  naturais no fuso da empresa), `bootstrap` (planos + catálogo de permissões).
+- **http/** — app Express, registro de rotas, middlewares: `request-id`,
+  `authenticate` (JWT → abre `RequestContext`), `requirePermission(...)`, tratamento
+  central de erro (padroniza; nunca stack trace ao cliente).
+- **modules/** — domínios. Cada um: `*.service.ts` (regra de negócio, única camada
+  que fala com Prisma; grava `AuditLog`) e `*.controller.ts` (rotas REST + Zod +
+  `requirePermission`).
+- **ai/** — `provider` (cliente OpenAI-compatível + `StubProvider`), `tools`
+  (registry + 49 definições com `permission` e `destructive`), `orchestrator`,
+  `security`, `conversations` (memória), `system-prompt`.
+- **integrations/** — `messaging` (`MessagingProvider` + Telegram/WhatsApp),
+  `inbound` (comandos + roteamento p/ orchestrator), `outbound`, `webhooks`, `channels`.
 
-- **core/** — infra transversal: carga/validação de env (Zod), logger (pino),
-  Prisma Client com *tenant guard*, contexto de requisição (`AsyncLocalStorage`),
-  utilitários de dinheiro (`Prisma.Decimal`) e datas (dayjs + parser PT-BR).
-- **http/** — aplicação Express, registro de rotas, middlewares (request-id,
-  autenticação/contexto, tratamento de erro central).
-- **modules/** — domínios de negócio. Cada módulo tem `*.service.ts` (regra de
-  negócio, única camada que fala com o Prisma) e `*.controller.ts` (rotas REST +
-  validação Zod).
-- **ai/** — orquestração da IA: provider, ferramentas, orchestrator, persistência
-  de conversa.
-- **integrations/** — canais externos (Telegram, WhatsApp) e o ponto de entrada
-  único `handleInboundMessage`.
-
-## Fluxo de uma mensagem da IA
-
-1. Entrada: `POST /api/ai/chat` (web, autenticado) **ou** webhook/polling de
-   Telegram/WhatsApp.
-2. Para canais externos, `handleInboundMessage` resolve o **tenant** pelo
-   `ChannelLink (channel, externalId)`. Sem vínculo, tenta consumir um
-   `PairingCode` (`/start CODIGO`).
-3. Estabelece o `RequestContext` (`companyId`, `userId`, `source`) via
-   `runWithContext`.
-4. `runOrchestrator`:
-   - carrega histórico da `Conversation` (últimas 16 mensagens),
-   - monta `system prompt` (regras + data/hora + empresa),
-   - chama o modelo com o catálogo de **tool schemas** (JSON Schema gerado a
-     partir de Zod),
-   - **loop** (máx. `AI_MAX_TOOL_ITERATIONS`): se o modelo pediu tools, cada
-     chamada é validada (Zod), executada via `executeTool` → `service`, o
-     resultado volta como mensagem `role: "tool"`, e auditada em `AiToolCall`.
-   - quando o modelo responde sem tools, o texto final é persistido e devolvido.
-5. A resposta é enviada de volta pelo canal de origem.
-
-### Garantia "não confirmar antes da hora"
-
-O `system prompt` proíbe afirmar sucesso sem retorno de ferramenta, e o
-orchestrator só devolve ao usuário o texto que o modelo gera **após** ver os
-resultados das tools. Erros de tool voltam como `{ "error": "..." }` e o modelo é
-instruído a reportá-los.
-
-### Desambiguação
-
-Tools que resolvem entidades por nome (cliente/produto/conta) lançam
-`NeedsClarification` quando há mais de um candidato. Isso vira
-`{ needsClarification: true, question, candidates }` no resultado da tool, e o
-modelo pergunta ao usuário em vez de escolher sozinho.
-
-## Multi-tenancy
+## Multi-tenancy (§5)
 
 | Camada | Mecanismo |
 |--------|-----------|
-| 1 | `RequestContext` via `AsyncLocalStorage` — `companyId` nunca vem do payload do cliente |
+| 1 | `RequestContext` via `AsyncLocalStorage` — `companyId` nunca vem do payload |
 | 2 | Services usam `scope()` / `tenantWhere()` / `tenantData()` |
-| 3 | `prisma.$extends` (`core/prisma.ts`): injeta `companyId` em operações com `where`/`data` quando há contexto; **lança** se um modelo de negócio (`HARD_TENANT_MODELS`) for lido sem contexto |
-| 4 | Schema: `companyId` + `@@index([companyId, ...])` em todas as entidades de negócio; `@@unique` compostos por tenant (ex.: `Sale.number`) |
-| — | Futuro: Postgres Row-Level Security |
+| 3 | `prisma.$extends`: injeta `companyId` quando há contexto; **lança** se um modelo de negócio (`HARD_TENANT_MODELS`) for lido sem contexto |
+| 4 | Schema: `companyId` + `@@index([companyId, …])`; `@@unique` compostos por tenant |
 
-`findUnique`/`update`/`delete` por id **não** são filtrados pelo guard (o `where`
-por unique não aceita `companyId`); por isso os services usam finders
-`findFirst({ where: tenantWhere({ id }) })` ou `ensureSameTenant(row)` após
-carregar.
+`findUnique`/`update`/`delete` por id não são filtrados pelo guard — os services
+carregam com `findFirst({ where: { ...scope(), id } })` ou usam `ensureSameTenant()`.
+
+## RBAC (§6)
+
+- `UserRole` enum: `ADMIN | MANAGER | SELLER | FINANCE` (fonte de verdade do
+  enforcement, rápido, sem join).
+- `core/permissions.ts`: `PERMISSIONS` + `ROLE_MATRIX` (código).
+- Tabelas `Role` / `Permission` / `RolePermission`: espelham a matriz por empresa
+  (seed no registro), expostas em `GET /company/permissions` para transparência.
+- `requirePermission(...keys)` — passa se o perfil tem **alguma** das chaves.
+- SELLER: `sales.service` injeta `sellerId = currentUserId` em list/get/summary
+  (`sale.read.own`).
+
+## Fluxo da IA (§16)
+
+1. Entrada: `POST /api/ai/chat` (web) **ou** webhook/polling Telegram/WhatsApp.
+2. Canais externos: `handleInboundMessage` resolve tenant pelo `ChannelLink`
+   (`channel`, `externalId`); sem vínculo, consome `PairingCode` (`/start CÓDIGO`).
+   Comandos (`/resumo`, `/vendas`, …) são atendidos direto.
+3. `runWithContext({ companyId, userId, role, source })`.
+4. `runOrchestrator`:
+   - `security`: rate limit por usuário + flag de prompt-injection.
+   - carrega histórico (últimas `AI_HISTORY_MESSAGES`) + `summary` + memória operacional.
+   - `system prompt` (§29) fixo — a mensagem do usuário não o altera (§30).
+   - chama o modelo com **tool schemas filtrados pelo perfil**.
+   - loop (≤ `AI_MAX_TOOL_ITERATIONS`): valida args (Zod), checa permissão da tool,
+     exige `confirm` em tools `destructive` (§18), executa via service, devolve
+     resultado como mensagem `role:"tool"`, atualiza memória operacional.
+   - `NeedsClarification` → `{ needsClarification, question, candidates }` (§19).
+   - grava `AIExecution` (§28) e `AuditLog` (§27) quando houve tool.
+   - `maybeSummarize` condensa mensagens antigas (§20), sem chamar o modelo.
+
+## Automações & Scheduler (§25 / §35)
+
+- `Automation { trigger, action, config }`. Triggers: `schedule.daily|weekly`,
+  `stock.low`, `customer.overdue`, `account.due_soon`, `sale.created`.
+- `core/scheduler.ts`: `setInterval` de 10 min, dispara diárias às 08:00 e semanais
+  na segunda. `REDIS_URL` reservado para BullMQ (não implementado nesta versão).
+- `fireTrigger(companyId, trigger)` roda dentro de um contexto de sistema.
+
+## Notificações (§26)
+
+`Notification { type, title, body }` no painel; `notify()` é o ponto de extensão
+para Telegram/WhatsApp/e-mail. Contador de não lidas em `GET /notifications`.
 
 ## Modelo de dados (resumo)
 
-- **Tenancy/Auth:** `Company`, `User`, `RefreshToken`, `Subscription` (stub billing)
-- **CRM:** `Customer`
-- **Catálogo/Estoque:** `Product`, `StockMovement` (IN/OUT/ADJUST, com `balanceAfter`)
-- **Vendas:** `Sale`, `SaleItem` (venda gera baixa de estoque + lançamento
-  financeiro + `Receivable` se fiado)
-- **Financeiro:** `FinanceCategory`, `FinanceTransaction`, `Receivable`, `Payable`
-  (status `OPEN/PARTIAL/PAID/CANCELED`)
-- **Agenda:** `AgendaEvent`
-- **IA:** `Conversation`, `Message`, `ChannelLink`, `PairingCode`, `AiToolCall`
+Plan · Subscription · Company · User · Role · Permission · RolePermission ·
+Customer · Supplier · ProductCategory · Product · Inventory · InventoryMovement ·
+Sale · SaleItem · Payment · FinancialCategory · Income · Expense ·
+AccountReceivable · AccountPayable · Charge · Appointment · Notification ·
+ChannelLink · PairingCode · Conversation · Message · AIExecution ·
+Automation · Document · AuditLog · Integration.
 
-## Dinheiro
+Dinheiro em `Decimal(12,2)`; quantidades em `Decimal(14,3)`. `createdAt`/`updatedAt`
+em todos; `deletedAt` (soft delete) em Customer/Supplier/Product/ProductCategory/User.
 
-Valores monetários usam `Prisma.Decimal` (`@db.Decimal(12,2)`); quantidades de
-estoque `@db.Decimal(14,3)`. Helpers `money()` / `qty()` em `core/money.ts`
-arredondam com `ROUND_HALF_UP`. Nunca usar `number` para acumular dinheiro no
-domínio.
+## LGPD (§44)
 
-## Autenticação
+- Controle de acesso (RBAC) + auditoria + logs sem credenciais.
+- `GET /company/lgpd/export` — portabilidade (JSON completo do tenant).
+- `POST /company/lgpd/erase-customer/:id` — anonimização + soft delete.
+- `Company.retentionDays` — política de retenção configurável (base para expurgo).
 
-- `POST /auth/register` cria `Company` + `User(OWNER)` + `Subscription(TRIALING)` +
-  categorias financeiras padrão.
-- Access token JWT (15 min) + refresh token (30 d) **persistido com hash** em
-  `RefreshToken`; `POST /auth/refresh` **rotaciona** (revoga o antigo).
-- Middleware `authenticate` valida o access token e abre o `RequestContext` para
-  toda a cadeia; `authorize(...roles)` para RBAC.
+## Segurança da IA (§30)
 
-## Provider de IA
-
-`AIProvider` (`chat`, `health`). Implementações:
-
-- `OpenAICompatibleProvider` — usa o SDK `openai` com `baseURL` custom; funciona
-  com Ollama (`/v1`), OpenRouter, Together, vLLM, OpenAI.
-- `StubProvider` — regex determinístico PT-BR; usado em testes
-  (`AI_PROVIDER=stub`) e para desenvolvimento offline.
-
-Trocar de provider é só mudar `AI_PROVIDER`, `AI_BASE_URL`, `AI_API_KEY`,
-`AI_MODEL` no `.env`.
+- System prompt imutável pelo usuário; instrução explícita para recusar
+  "ignore as regras" / pedidos de dados de outra empresa.
+- Tool schemas e execução **filtrados pelo perfil** (sem chamadas não autorizadas).
+- Args validados por Zod (sem manipulação de parâmetros fora do schema).
+- Rate limit por (empresa+usuário); truncagem de mensagens gigantes.
+- Isolamento cross-tenant garantido pelas 4 camadas de multi-tenancy.

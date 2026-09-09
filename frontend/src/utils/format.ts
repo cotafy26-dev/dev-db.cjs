@@ -22,17 +22,27 @@ export const PAYMENT_LABELS: Record<string, string> = {
   PIX: 'Pix',
   DEBIT: 'Débito',
   CREDIT: 'Crédito',
-  TRANSFER: 'Transferência',
   BOLETO: 'Boleto',
+  TRANSFER: 'Transferência',
   OTHER: 'Outro',
 };
 
 export const STATUS_LABELS: Record<string, string> = {
-  PAID: 'Pago',
+  DRAFT: 'Rascunho',
+  CONFIRMED: 'Confirmada',
+  PAID: 'Paga',
   PARTIAL: 'Parcial',
   PENDING: 'Pendente',
   OPEN: 'Em aberto',
-  CANCELED: 'Cancelado',
+  CANCELED: 'Cancelada',
   SCHEDULED: 'Agendado',
   DONE: 'Concluído',
+  SENT: 'Enviada',
 };
+
+export function statusTone(s: string): 'green' | 'amber' | 'red' | 'slate' {
+  if (['PAID', 'DONE'].includes(s)) return 'green';
+  if (['CANCELED'].includes(s)) return 'red';
+  if (['PARTIAL', 'CONFIRMED', 'OPEN', 'PENDING', 'SENT', 'SCHEDULED'].includes(s)) return 'amber';
+  return 'slate';
+}

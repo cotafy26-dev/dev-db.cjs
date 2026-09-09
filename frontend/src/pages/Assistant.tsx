@@ -63,7 +63,7 @@ export function AssistantPage() {
                 className={
                   m.role === 'user'
                     ? 'max-w-[80%] rounded-2xl rounded-br-sm bg-brand-600 px-4 py-2 text-sm text-white'
-                    : 'max-w-[80%] rounded-2xl rounded-bl-sm bg-slate-100 px-4 py-2 text-sm text-slate-800'
+                    : 'max-w-[80%] rounded-2xl rounded-bl-sm bg-slate-100 px-4 py-2 text-sm text-slate-800 dark:bg-slate-800 dark:text-slate-100'
                 }
               >
                 <div className="whitespace-pre-wrap">{m.content}</div>
