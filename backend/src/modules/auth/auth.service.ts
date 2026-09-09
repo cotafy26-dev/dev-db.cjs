@@ -1,16 +1,14 @@
 import { createHash } from 'node:crypto';
+import type { UserRole } from '@prisma/client';
 import { prisma } from '../../core/prisma';
 import { ConflictError, UnauthorizedError } from '../../core/errors';
 import { token as randomToken } from '../../core/ids';
 import { dayjs } from '../../core/dates';
-import {
-  signAccessToken,
-  signRefreshToken,
-  ttlToMs,
-  verifyRefreshToken,
-} from './jwt';
+import { signAccessToken, signRefreshToken, ttlToMs, verifyRefreshToken } from './jwt';
 import { env } from '../../core/env';
 import { hashPassword, verifyPassword } from './password';
+import { provisionRoles } from '../rbac/rbac.service';
+import { getPlanByCode } from '../plans/plans.service';
 import type { LoginInput, RegisterInput } from './auth.schemas';
 
 function hashToken(raw: string): string {
@@ -27,17 +25,19 @@ export interface SessionUser {
   id: string;
   name: string;
   email: string;
-  role: string;
+  role: UserRole;
   companyId: string;
   companyName: string;
+  segment: string | null;
+  currency: string;
+  timezone: string;
+  onboarded: boolean;
 }
 
-async function issueTokens(user: {
-  id: string;
-  email: string;
-  role: string;
-  companyId: string;
-}, meta: { userAgent?: string; ip?: string }): Promise<AuthTokens> {
+async function issueTokens(
+  user: { id: string; email: string; role: UserRole; companyId: string },
+  meta: { userAgent?: string; ip?: string },
+): Promise<AuthTokens> {
   const refreshRecord = await prisma.refreshToken.create({
     data: {
       userId: user.id,
@@ -57,11 +57,33 @@ async function issueTokens(user: {
   const accessToken = signAccessToken({
     sub: user.id,
     companyId: user.companyId,
-    role: user.role as never,
+    role: user.role,
     email: user.email,
   });
 
   return { accessToken, refreshToken, expiresIn: Math.floor(ttlToMs(env.JWT_ACCESS_TTL) / 1000) };
+}
+
+function toSession(user: {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  companyId: string;
+  company: { name: string; segment: string | null; currency: string; timezone: string; onboardedAt: Date | null };
+}): SessionUser {
+  return {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    role: user.role,
+    companyId: user.companyId,
+    companyName: user.company.name,
+    segment: user.company.segment,
+    currency: user.company.currency,
+    timezone: user.company.timezone,
+    onboarded: Boolean(user.company.onboardedAt),
+  };
 }
 
 export async function register(
@@ -72,59 +94,61 @@ export async function register(
   if (existing) throw new ConflictError('E-mail ja cadastrado');
 
   const passwordHash = await hashPassword(input.user.password);
+  const basic = await getPlanByCode('BASIC');
 
   const company = await prisma.company.create({
     data: {
       name: input.company.name,
       document: input.company.document,
+      segment: input.company.segment,
       phone: input.company.phone,
+      timezone: input.company.timezone ?? 'America/Sao_Paulo',
+      currency: input.company.currency ?? 'BRL',
+      onboardedAt: new Date(),
       users: {
-        create: {
-          name: input.user.name,
-          email: input.user.email,
-          passwordHash,
-          role: 'OWNER',
-        },
+        create: { name: input.user.name, email: input.user.email, passwordHash, role: 'ADMIN' },
       },
       subscription: {
         create: {
-          plan: 'trial',
+          planId: basic?.id,
           status: 'TRIALING',
           trialEndsAt: dayjs().add(14, 'day').toDate(),
         },
       },
-      financeCategories: {
+      financialCategories: {
         create: [
-          { name: 'Vendas', type: 'INCOME' },
-          { name: 'Servicos', type: 'INCOME' },
-          { name: 'Fornecedores', type: 'EXPENSE' },
-          { name: 'Combustivel', type: 'EXPENSE' },
-          { name: 'Aluguel', type: 'EXPENSE' },
-          { name: 'Salarios', type: 'EXPENSE' },
-          { name: 'Outros', type: 'EXPENSE' },
+          { name: 'Vendas', direction: 'IN' },
+          { name: 'Servicos', direction: 'IN' },
+          { name: 'Outras receitas', direction: 'IN' },
+          { name: 'Fornecedores', direction: 'OUT' },
+          { name: 'Energia', direction: 'OUT' },
+          { name: 'Agua', direction: 'OUT' },
+          { name: 'Combustivel', direction: 'OUT' },
+          { name: 'Aluguel', direction: 'OUT' },
+          { name: 'Salarios', direction: 'OUT' },
+          { name: 'Impostos', direction: 'OUT' },
+          { name: 'Outras despesas', direction: 'OUT' },
         ],
       },
     },
     include: { users: true },
   });
 
+  await provisionRoles(company.id);
+  const adminRole = await prisma.role.findUnique({
+    where: { companyId_key: { companyId: company.id, key: 'ADMIN' } },
+  });
   const user = company.users[0]!;
+  if (adminRole) {
+    await prisma.user.update({ where: { id: user.id }, data: { roleRefId: adminRole.id } });
+  }
+
+  const full = await prisma.user.findUniqueOrThrow({ where: { id: user.id }, include: { company: true } });
   const tokens = await issueTokens(
-    { id: user.id, email: user.email, role: user.role, companyId: company.id },
+    { id: user.id, email: user.email, role: 'ADMIN', companyId: company.id },
     meta,
   );
-
-  return {
-    tokens,
-    user: {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      companyId: company.id,
-      companyName: company.name,
-    },
-  };
+  return { tokens, user: toSession(full) };
 }
 
 export async function login(
@@ -132,7 +156,7 @@ export async function login(
   meta: { userAgent?: string; ip?: string } = {},
 ): Promise<{ tokens: AuthTokens; user: SessionUser }> {
   const user = await prisma.user.findFirst({
-    where: { email: input.email, active: true },
+    where: { email: input.email, active: true, deletedAt: null },
     include: { company: true },
   });
   if (!user) throw new UnauthorizedError('Credenciais invalidas');
@@ -144,18 +168,7 @@ export async function login(
     { id: user.id, email: user.email, role: user.role, companyId: user.companyId },
     meta,
   );
-
-  return {
-    tokens,
-    user: {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      companyId: user.companyId,
-      companyName: user.company.name,
-    },
-  };
+  return { tokens, user: toSession(user) };
 }
 
 export async function refresh(
@@ -177,11 +190,7 @@ export async function refresh(
     throw new UnauthorizedError('Sessao expirada, faca login novamente');
   }
 
-  // Rotaciona: revoga o token atual e emite um novo par.
-  await prisma.refreshToken.update({
-    where: { id: record.id },
-    data: { revokedAt: new Date() },
-  });
+  await prisma.refreshToken.update({ where: { id: record.id }, data: { revokedAt: new Date() } });
 
   return issueTokens(
     {
@@ -202,7 +211,7 @@ export async function logout(rawRefreshToken: string): Promise<void> {
       data: { revokedAt: new Date() },
     });
   } catch {
-    // token invalido -> logout idempotente
+    /* logout idempotente */
   }
 }
 
@@ -211,14 +220,7 @@ export async function getSession(userId: string): Promise<SessionUser> {
     where: { id: userId },
     include: { company: true },
   });
-  return {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    role: user.role,
-    companyId: user.companyId,
-    companyName: user.company.name,
-  };
+  return toSession(user);
 }
 
 export { randomToken };

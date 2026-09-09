@@ -2,6 +2,7 @@ import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import type { UserRole } from '@prisma/client';
 import { ForbiddenError, UnauthorizedError } from '../../core/errors';
 import { runWithContext, type RequestContext } from '../../core/context';
+import { roleHasAny, type Permission } from '../../core/permissions';
 import { verifyAccessToken } from '../../modules/auth/jwt';
 
 declare module 'express-serve-static-core' {
@@ -35,21 +36,30 @@ export const authenticate: RequestHandler = (req, res, next) => {
     role: payload.role,
     source: 'http',
     requestId: req.id ?? 'unknown',
+    ip: req.ip,
     email: payload.email,
   };
   req.auth = ctx;
   runWithContext(ctx, () => next());
 };
 
+/** Exige um dos perfis informados. */
 export function authorize(...roles: UserRole[]): RequestHandler {
   return (req: Request, _res: Response, next: NextFunction) => {
-    if (!req.auth) {
-      next(new UnauthorizedError());
-      return;
-    }
+    if (!req.auth) return next(new UnauthorizedError());
     if (roles.length > 0 && (!req.auth.role || !roles.includes(req.auth.role))) {
-      next(new ForbiddenError(`Requer perfil: ${roles.join(', ')}`));
-      return;
+      return next(new ForbiddenError(`Requer perfil: ${roles.join(', ')}`));
+    }
+    next();
+  };
+}
+
+/** Exige que o perfil do usuario possua PELO MENOS UMA das permissoes (secao 6). */
+export function requirePermission(...permissions: Permission[]): RequestHandler {
+  return (req: Request, _res: Response, next: NextFunction) => {
+    if (!req.auth?.role) return next(new UnauthorizedError());
+    if (!roleHasAny(req.auth.role, permissions)) {
+      return next(new ForbiddenError(`Sem permissao: ${permissions.join(' | ')}`));
     }
     next();
   };

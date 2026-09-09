@@ -2,35 +2,45 @@ import { NotFoundError } from './errors';
 import { currentCompanyId, tryGetContext } from './context';
 
 /**
- * Modelos com companyId cuja leitura SEM contexto de tenant e proibida.
- * (Os demais modelos - Company, User, RefreshToken, etc. - sao acessados por
- * codigo de infraestrutura confiavel antes do contexto existir.)
+ * Modelos de negocio cuja leitura SEM contexto de tenant e proibida (secao 5:
+ * "isolamento de dados em todas as consultas").
  */
 export const HARD_TENANT_MODELS = new Set<string>([
   'Customer',
+  'Supplier',
+  'ProductCategory',
   'Product',
-  'StockMovement',
+  'Inventory',
+  'InventoryMovement',
   'Sale',
-  'FinanceCategory',
-  'FinanceTransaction',
-  'Receivable',
-  'Payable',
-  'AgendaEvent',
-  'AiToolCall',
+  'Payment',
+  'FinancialCategory',
+  'Income',
+  'Expense',
+  'AccountReceivable',
+  'AccountPayable',
+  'Appointment',
+  'Notification',
+  'AIExecution',
+  'Automation',
+  'Document',
+  'AuditLog',
 ]);
 
 /**
  * Todos os modelos com coluna companyId (auto-injecao quando ha contexto).
- * NB: SaleItem e Message nao entram (escopados via relacao); Company e o proprio
- * tenant (nao tem companyId).
+ * NB: Company e o proprio tenant; Permission/RolePermission/RefreshToken/Message/
+ * SaleItem/Plan nao tem companyId.
  */
 export const TENANT_MODELS = new Set<string>([
   ...HARD_TENANT_MODELS,
   'User',
+  'Role',
   'ChannelLink',
   'PairingCode',
   'Conversation',
   'Subscription',
+  'Integration',
 ]);
 
 /** companyId do tenant atual - para espalhar em objetos where/data tipados pelo Prisma. */

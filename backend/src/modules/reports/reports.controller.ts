@@ -1,29 +1,50 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { asyncHandler, ok, parseBody } from '../../core/http';
+import { requirePermission } from '../../http/middlewares/auth';
 import * as service from './reports.service';
 
 export const reportsRouter = Router();
+const periodQuery = z.object({ period: z.string().optional() });
 
 reportsRouter.get(
   '/overview',
-  asyncHandler(async (_req, res) => {
-    ok(res, await service.overview());
-  }),
+  requirePermission('report.read'),
+  asyncHandler(async (_req, res) => ok(res, await service.overview())),
 );
 
 reportsRouter.get(
-  '/sales-by-day',
-  asyncHandler(async (req, res) => {
-    const q = parseBody(z.object({ days: z.coerce.number().int().positive().max(90).default(14) }), req.query);
-    ok(res, await service.salesByDay(q.days));
-  }),
+  '/sales',
+  requirePermission('report.read'),
+  asyncHandler(async (req, res) => ok(res, await service.salesReport(parseBody(periodQuery, req.query).period))),
 );
 
 reportsRouter.get(
-  '/top-products',
-  asyncHandler(async (req, res) => {
-    const q = parseBody(z.object({ limit: z.coerce.number().int().positive().max(20).default(5) }), req.query);
-    ok(res, await service.topProducts(q.limit));
-  }),
+  '/financial',
+  requirePermission('report.finance.read'),
+  asyncHandler(async (req, res) => ok(res, await service.financialReport(parseBody(periodQuery, req.query).period))),
+);
+
+reportsRouter.get(
+  '/profit',
+  requirePermission('report.finance.read'),
+  asyncHandler(async (req, res) => ok(res, await service.profitReport(parseBody(periodQuery, req.query).period))),
+);
+
+reportsRouter.get(
+  '/inventory',
+  requirePermission('report.read'),
+  asyncHandler(async (_req, res) => ok(res, await service.inventoryReport())),
+);
+
+reportsRouter.get(
+  '/customers',
+  requirePermission('report.read'),
+  asyncHandler(async (_req, res) => ok(res, await service.customerReport())),
+);
+
+reportsRouter.get(
+  '/sellers',
+  requirePermission('report.read'),
+  asyncHandler(async (req, res) => ok(res, await service.sellerReport(parseBody(periodQuery, req.query).period))),
 );

@@ -31,23 +31,69 @@ export function monthRange(date: dayjs.ConfigType, tz: string = DEFAULT_TZ): Dat
   return { from: d.startOf('month').toDate(), to: d.add(1, 'month').startOf('month').toDate() };
 }
 
+const WEEKDAYS: Record<string, number> = {
+  domingo: 0,
+  'segunda': 1,
+  'segunda-feira': 1,
+  terca: 2,
+  'terça': 2,
+  'terca-feira': 2,
+  'terça-feira': 2,
+  quarta: 3,
+  'quarta-feira': 3,
+  quinta: 4,
+  'quinta-feira': 4,
+  sexta: 5,
+  'sexta-feira': 5,
+  sabado: 6,
+  'sábado': 6,
+};
+
 /**
- * Interpreta expressoes de data em linguagem natural PT-BR usadas pela IA e pelo painel.
- * Aceita: 'hoje', 'ontem', 'amanha', 'semana', 'mes', ISO, dd/mm/yyyy, dd/mm.
+ * Interpreta expressoes de data em linguagem natural PT-BR (secao 13).
+ * Aceita: 'hoje', 'ontem', 'amanha', 'depois de amanha', dias da semana,
+ * 'semana que vem', 'daqui a N dias/semanas', ISO, dd/mm/yyyy, dd/mm.
+ * Sempre no timezone da empresa.
  */
 export function parseNaturalDate(input: string, tz: string = DEFAULT_TZ): Date | null {
-  const raw = input.trim().toLowerCase();
+  const raw = input.trim().toLowerCase().replace(/\s+/g, ' ');
   const base = nowIn(tz);
   const map: Record<string, dayjs.Dayjs> = {
     hoje: base,
-    'agora': base,
+    agora: base,
     ontem: base.subtract(1, 'day'),
     anteontem: base.subtract(2, 'day'),
     amanha: base.add(1, 'day'),
     'amanhã': base.add(1, 'day'),
     'depois de amanha': base.add(2, 'day'),
+    'depois de amanhã': base.add(2, 'day'),
+    'semana que vem': base.add(1, 'week').startOf('week').add(1, 'day'),
+    'proxima semana': base.add(1, 'week').startOf('week').add(1, 'day'),
+    'próxima semana': base.add(1, 'week').startOf('week').add(1, 'day'),
+    'mes que vem': base.add(1, 'month').startOf('month'),
+    'mês que vem': base.add(1, 'month').startOf('month'),
   };
   if (raw in map) return map[raw]!.toDate();
+
+  // "daqui a 3 dias" / "em 2 semanas"
+  const rel = raw.match(/^(?:daqui a|em|daqui)\s+(\d+)\s+(dia|dias|semana|semanas|mes|meses|mês|mêses)$/);
+  if (rel) {
+    const n = Number(rel[1]);
+    const unit = rel[2]!.startsWith('semana') ? 'week' : rel[2]!.startsWith('m') ? 'month' : 'day';
+    return base.add(n, unit).toDate();
+  }
+
+  // dia da semana (proxima ocorrencia)
+  const wdKey = raw.replace(/^(proxima |próxima |na |essa |nesta )/, '');
+  if (wdKey in WEEKDAYS) {
+    const target = WEEKDAYS[wdKey]!;
+    let d = base;
+    for (let i = 1; i <= 7; i++) {
+      d = d.add(1, 'day');
+      if (d.day() === target) break;
+    }
+    return d.toDate();
+  }
 
   const iso = dayjs(input);
   if (iso.isValid() && /\d{4}-\d{2}-\d{2}/.test(input)) return iso.toDate();
@@ -63,10 +109,20 @@ export function parseNaturalDate(input: string, tz: string = DEFAULT_TZ): Date |
 }
 
 export function parseNaturalDateTime(input: string, tz: string = DEFAULT_TZ): Date | null {
-  const dateTimeMatch = input
-    .trim()
-    .toLowerCase()
-    .match(/^(.*?)(?:\s+(?:as|às|as as)\s+|\s+)(\d{1,2})(?:[:h](\d{2}))?\s*h?$/);
+  const raw = input.trim().toLowerCase().replace(/\s+/g, ' ');
+
+  // "daqui a duas horas" / "em 2 horas" / "daqui a 90 minutos"
+  const numWords: Record<string, number> = { uma: 1, duas: 2, tres: 3, 'três': 3, meia: 0.5 };
+  const relH = raw.match(/^(?:daqui a|em|daqui)\s+(\d+|uma|duas|tres|três|meia)\s+(hora|horas|minuto|minutos|min)$/);
+  if (relH) {
+    const n = numWords[relH[1]!] ?? Number(relH[1]);
+    const mins = relH[2]!.startsWith('min') ? n : n * 60;
+    return nowIn(tz).add(mins, 'minute').second(0).millisecond(0).toDate();
+  }
+
+  const dateTimeMatch = raw.match(
+    /^(.*?)(?:\s+(?:as|às|as as)\s+|\s+)(\d{1,2})(?:[:h](\d{2}))?\s*h?$/,
+  );
   if (dateTimeMatch) {
     const [, datePart, hh, mm] = dateTimeMatch;
     const day = parseNaturalDate((datePart || 'hoje').trim() || 'hoje', tz);

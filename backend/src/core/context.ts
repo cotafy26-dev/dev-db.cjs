@@ -14,6 +14,7 @@ export interface RequestContext {
   /** Origem da acao: 'http' | 'telegram' | 'whatsapp' | 'system' */
   source: string;
   requestId: string;
+  ip?: string;
 }
 
 const storage = new AsyncLocalStorage<RequestContext>();
@@ -41,4 +42,8 @@ export function currentCompanyId(): string {
 
 export function currentUserId(): string | null {
   return getContext().userId;
+}
+
+export function currentRole(): UserRole | null {
+  return getContext().role;
 }

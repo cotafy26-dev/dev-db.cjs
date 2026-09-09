@@ -4,7 +4,10 @@ export const registerSchema = z.object({
   company: z.object({
     name: z.string().min(2).max(120),
     document: z.string().max(20).optional(),
+    segment: z.string().max(80).optional(),
     phone: z.string().max(20).optional(),
+    timezone: z.string().max(64).optional(),
+    currency: z.string().length(3).optional(),
   }),
   user: z.object({
     name: z.string().min(2).max(120),

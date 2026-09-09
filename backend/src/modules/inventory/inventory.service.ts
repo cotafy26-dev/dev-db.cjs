@@ -1,50 +1,63 @@
-import type { StockMovementType } from '@prisma/client';
+import type { InventoryMovementType } from '@prisma/client';
 import { prisma } from '../../core/prisma';
 import type { Db } from '../../core/prisma-types';
 import { NotFoundError, ValidationError } from '../../core/errors';
 import { currentUserId } from '../../core/context';
-import { tenantWhere } from '../../core/tenant';
+import { scope } from '../../core/tenant';
 import { qty } from '../../core/money';
+import { audit } from '../../core/audit';
 import { toSkipTake, type Pagination } from '../../core/pagination';
 
-interface MoveInput {
+export interface MoveInput {
   productId: string;
-  type: StockMovementType;
-  /** magnitude positiva */
+  type: InventoryMovementType;
+  /** magnitude positiva; para ADJUST e o saldo alvo */
   quantity: number;
   reason?: string;
+  reference?: string;
   saleId?: string;
 }
 
 /**
- * Aplica movimento de estoque de forma atomica: atualiza Product.stock e grava
- * StockMovement. Use dentro de uma transacao ao compor com vendas.
+ * Aplica movimento de estoque de forma atomica: atualiza Inventory.quantity e
+ * grava InventoryMovement. Use dentro de uma transacao ao compor com vendas.
  */
-export async function applyStockMovement(input: MoveInput, tx: Db = prisma) {
+export async function applyMovement(input: MoveInput, tx: Db = prisma) {
   const magnitude = qty(input.quantity);
-  if (magnitude.lessThanOrEqualTo(0)) {
+  if (input.type !== 'ADJUST' && magnitude.lessThanOrEqualTo(0)) {
     throw new ValidationError('Quantidade do movimento deve ser positiva');
   }
 
-  const product = await tx.product.findFirst({ where: tenantWhere({ id: input.productId }) });
+  const product = await tx.product.findFirst({
+    where: { ...scope(), id: input.productId, deletedAt: null },
+    include: { inventory: true },
+  });
   if (!product) throw new NotFoundError('Produto', input.productId);
 
-  const delta =
-    input.type === 'IN'
-      ? magnitude
-      : input.type === 'OUT'
-        ? magnitude.negated()
-        : magnitude.minus(product.stock); // ADJUST: quantity = saldo alvo
+  let inventory = product.inventory;
+  if (!inventory) {
+    inventory = await tx.inventory.create({
+      data: { companyId: product.companyId, productId: product.id, quantity: qty(0), minQuantity: qty(0) },
+    });
+  }
 
-  const balanceAfter = product.stock.plus(delta);
+  const current = inventory.quantity;
+  const delta =
+    input.type === 'ADJUST'
+      ? magnitude.minus(current)
+      : input.type === 'IN' || input.type === 'RETURN'
+        ? magnitude
+        : magnitude.negated(); // OUT | SALE
+
+  const balanceAfter = current.plus(delta);
   if (balanceAfter.lessThan(0)) {
     throw new ValidationError(
-      `Estoque insuficiente de "${product.name}": disponivel ${product.stock.toNumber()}, solicitado ${magnitude.toNumber()}`,
+      `Estoque insuficiente de "${product.name}": disponivel ${current.toNumber()}, solicitado ${magnitude.toNumber()}`,
     );
   }
 
-  await tx.product.update({ where: { id: product.id }, data: { stock: balanceAfter } });
-  const movement = await tx.stockMovement.create({
+  await tx.inventory.update({ where: { id: inventory.id }, data: { quantity: balanceAfter } });
+  const movement = await tx.inventoryMovement.create({
     data: {
       companyId: product.companyId,
       productId: product.id,
@@ -52,24 +65,54 @@ export async function applyStockMovement(input: MoveInput, tx: Db = prisma) {
       quantity: input.type === 'ADJUST' ? balanceAfter : magnitude,
       balanceAfter,
       reason: input.reason ?? null,
+      reference: input.reference ?? null,
       saleId: input.saleId ?? null,
-      createdBy: currentUserId(),
+      createdById: currentUserId(),
     },
   });
 
   return { movement, balanceAfter: balanceAfter.toNumber(), product: { id: product.id, name: product.name } };
 }
 
+/** Movimento avulso via API/tool (fora de venda) - registra auditoria. */
+export async function registerMovement(input: MoveInput) {
+  const result = await prisma.$transaction((tx) => applyMovement(input, tx));
+  await audit({
+    action: 'inventory.move',
+    entityType: 'Product',
+    entityId: input.productId,
+    summary: `${input.type} ${input.quantity} -> saldo ${result.balanceAfter}`,
+    after: input,
+  });
+  return result;
+}
+
+export async function getStock(productId: string) {
+  const product = await prisma.product.findFirst({
+    where: { ...scope(), id: productId, deletedAt: null },
+    include: { inventory: true },
+  });
+  if (!product) throw new NotFoundError('Produto', productId);
+  return {
+    productId: product.id,
+    name: product.name,
+    unit: product.unit,
+    quantity: product.inventory?.quantity.toNumber() ?? 0,
+    minQuantity: product.inventory?.minQuantity.toNumber() ?? 0,
+    location: product.inventory?.location ?? null,
+  };
+}
+
 export async function listMovements(p: Pagination & { productId?: string }) {
-  const where = tenantWhere(p.productId ? { productId: p.productId } : undefined);
+  const where = { ...scope(), ...(p.productId ? { productId: p.productId } : {}) };
   const [items, total] = await Promise.all([
-    prisma.stockMovement.findMany({
+    prisma.inventoryMovement.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       include: { product: { select: { name: true, unit: true } } },
       ...toSkipTake(p),
     }),
-    prisma.stockMovement.count({ where }),
+    prisma.inventoryMovement.count({ where }),
   ]);
   return { items, total };
 }

@@ -3,8 +3,8 @@ import type { AIProvider, ChatRequest, ChatResponse, ChatToolCall } from './type
 
 /**
  * Provedor deterministico para testes e uso offline (AI_PROVIDER=stub).
- * Faz uma extracao simples por regex das intencoes mais comuns em PT-BR.
- * NAO substitui um modelo real - cobre o "caminho feliz" para validar a stack.
+ * Extrai por regex as intencoes mais comuns em PT-BR e aciona as tools reais.
+ * NAO substitui um modelo - cobre o caminho feliz para validar a stack.
  */
 
 function num(s: string): number {
@@ -22,82 +22,69 @@ function call(name: string, args: Record<string, unknown>): ChatToolCall {
 
 function detect(text: string): ChatToolCall[] {
   const t = text.toLowerCase().trim();
-
   let m: RegExpMatchArray | null;
 
-  if ((m = t.match(/despesa|gasto|paguei .* de/) )) {
-    const val = t.match(/(\d[\d.,]*)/);
-    const desc = t.match(/de\s+[\d.,]+\s+(?:reais\s+)?(?:de|com|no|na)\s+(.+)$/) ?? t.match(/(?:de|com)\s+([a-zà-ÿ\s]+)$/);
-    if (val) return [call('registrar_despesa', { amount: num(val[1]!), description: desc?.[1]?.trim() || 'Despesa' })];
-  }
-
-  if ((m = t.match(/(.+?)\s+me\s+pagou\s+(\d[\d.,]*)/)) || (m = t.match(/recebi\s+(\d[\d.,]*)\s+(?:reais\s+)?d[eo]\s+(.+)/))) {
-    if (/me\s+pagou/.test(t)) return [call('registrar_recebimento', { customerName: m[1]!.trim(), amount: num(m[2]!) })];
-    return [call('registrar_recebimento', { customerName: m[2]!.trim(), amount: num(m[1]!) })];
-  }
-
-  if ((m = t.match(/cadastr\w*\s+(.+?)\s+como\s+cliente/)) || (m = t.match(/nov[ao]\s+cliente\s+(.+)/))) {
-    return [call('cadastrar_cliente', { name: m[1]!.trim() })];
-  }
-
-  if (/quanto\s+vendi|vendas\s+de\s+hoje|total\s+de\s+vendas/.test(t)) {
-    const period = /ontem/.test(t) ? 'ontem' : /m[eê]s/.test(t) ? 'mes' : 'hoje';
-    return [call('resumo_vendas', { period })];
-  }
-
-  if (/a\s+receber|para\s+receber|tenho\s+.*receber/.test(t)) return [call('total_a_receber', {})];
-  if (/quem\s+(est\w*\s+devendo|me\s+deve|deve)/.test(t)) return [call('lista_devedores', {})];
-  if (/contas?\s+(a\s+)?venc\w+|vence\w*\s+amanh|o\s+que\s+vence/.test(t)) {
-    return [call('contas_a_vencer', { until: /amanh/.test(t) ? 'amanha' : 'hoje' })];
-  }
-  if (/estoque\s+baixo|acaba\w*|falta\w*\s+no\s+estoque/.test(t)) return [call('produtos_estoque_baixo', {})];
-  if (/faturamento\s+d\w*\s+m[eê]s|faturamento\s+mensal/.test(t)) return [call('faturamento_mes', {})];
-
-  if ((m = t.match(/registr\w*\s+(?:uma\s+)?venda\s+de\s+(\d[\d.,]*)\s+(.+?)\s+(?:por|a)\s+(\d[\d.,]*)/))) {
-    const customer = t.match(/para\s+([a-zà-ÿ\s]+?)(?:\s+no\s+|\s+em\s+|\s*$)/);
-    const pay = /pix/.test(t) ? 'PIX' : /dinheiro/.test(t) ? 'CASH' : /cart[aã]o|d[eé]bito/.test(t) ? 'DEBIT' : /cr[eé]dito/.test(t) ? 'CREDIT' : /fiado|depois/.test(t) ? null : null;
+  // Venda: "Joao comprou 3 camisas por 80 reais cada e pagou no Pix"
+  if (
+    (m = t.match(/(?:vend\w+|comprou|comprei)\s+(?:de\s+)?(\d[\d.,]*)\s+([a-zà-ÿ\s]+?)\s+(?:por|a)\s+(\d[\d.,]*)/))
+  ) {
+    const customer = t.match(/^([a-zà-ÿ\s]+?)\s+comprou/) ?? t.match(/para\s+([a-zà-ÿ\s]+?)(?:\s|$|,|\.)/);
+    const pay = /pix/.test(t) ? 'PIX' : /dinheiro/.test(t) ? 'CASH' : /d[eé]bito/.test(t) ? 'DEBIT' : /cr[eé]dito/.test(t) ? 'CREDIT' : undefined;
+    const fiado = /fiado|anota|depois|a prazo/.test(t);
     return [
-      call('registrar_venda', {
-        items: [{ description: m[2]!.trim(), quantity: num(m[1]!), unitPrice: num(m[3]!) }],
+      call('create_sale', {
+        items: [{ product: m[2]!.trim(), quantity: num(m[1]!), unitPrice: num(m[3]!) }],
         customerName: customer?.[1]?.trim(),
         paymentMethod: pay,
-        fiado: /fiado|depois|anota/.test(t),
+        paidAmount: fiado ? 0 : undefined,
       }),
     ];
   }
 
-  if ((m = t.match(/(?:marqu\w*|agend\w*)\s+(?:uma\s+)?(.+?)\s+com\s+(.+?)\s+(.+)$/))) {
-    return [call('agendar_evento', { title: m[1]!.trim(), customerName: m[2]!.trim(), whenText: m[3]!.trim() })];
+  // Despesa: "Paguei 120 reais de energia"
+  if ((m = t.match(/(?:paguei|gastei|despesa de|gasto de)\s+(\d[\d.,]*)\s*(?:reais\s+)?(?:de|com|no|na)?\s*([a-zà-ÿ\s]+)?/))) {
+    return [call('create_expense', { amount: num(m[1]!), description: (m[2]?.trim() || 'Despesa'), category: m[2]?.trim() })];
   }
 
-  if ((m = t.match(/(?:tenho|registr\w*|coloca)\s+(\d[\d.,]*)\s+(?:unidades?\s+)?(?:de\s+|desse\s+produto\s*)?(.+?)?\s*(?:no\s+estoque)?$/))) {
-    if (m[2]) return [call('ajustar_estoque', { productName: m[2]!.trim(), quantity: num(m[1]!) })];
+  // Recebimento: "Joao me pagou 300" / "recebi 300 de Joao"
+  if ((m = t.match(/([a-zà-ÿ\s]+?)\s+me\s+pagou\s+(\d[\d.,]*)/))) {
+    return [call('register_payment', { customerName: m[1]!.trim(), amount: num(m[2]!) })];
+  }
+  if ((m = t.match(/recebi\s+(\d[\d.,]*)\s+(?:reais\s+)?d[eo]\s+([a-zà-ÿ\s]+)/))) {
+    return [call('register_payment', { customerName: m[2]!.trim(), amount: num(m[1]!) })];
+  }
+
+  // Cliente: "cadastre Maria como cliente"
+  if ((m = t.match(/cadastr\w*\s+([a-zà-ÿ\s]+?)\s+como\s+cliente/)) || (m = t.match(/nov[ao]\s+cliente\s+([a-zà-ÿ\s]+)/))) {
+    return [call('create_customer', { name: m[1]!.trim() })];
+  }
+
+  if (/quanto\s+vendi|vendas\s+de\s+hoje|total\s+de\s+vendas/.test(t)) {
+    return [call('sales_summary', { period: /ontem/.test(t) ? 'ontem' : /m[eê]s/.test(t) ? 'mes' : 'hoje' })];
+  }
+  if (/(a|para)\s+receber|tenho\s+.*receber/.test(t)) return [call('get_receivables', {})];
+  if (/(a|para)\s+pagar|tenho\s+.*pagar/.test(t)) return [call('get_payables', {})];
+  if (/quem\s+(est\w*\s+devendo|me\s+deve|deve)|inadimpl/.test(t)) return [call('list_overdue_customers', {})];
+  if (/estoque\s+baixo|acaba\w*|falta\w*\s+no\s+estoque/.test(t)) return [call('low_stock_products', {})];
+  if (/faturamento|fluxo\s+de\s+caixa/.test(t)) return [call('get_cash_flow', {})];
+  if (/lucro/.test(t)) return [call('get_profit_report', { period: 'month' })];
+  if (/saldo/.test(t)) return [call('get_balance', {})];
+  if (/compromissos?\s+de\s+hoje|agenda\s+de\s+hoje/.test(t)) return [call('get_today_appointments', {})];
+
+  if ((m = t.match(/(?:marqu\w*|agend\w*)\s+(?:uma\s+)?([a-zà-ÿ\s]+?)\s+com\s+([a-zà-ÿ\s]+?)\s+(.+)$/))) {
+    return [call('create_appointment', { title: m[1]!.trim(), customerName: m[2]!.trim(), whenText: m[3]!.trim() })];
   }
 
   return [];
 }
 
 function summarize(toolName: string, result: unknown): string {
-  const r = result as Record<string, unknown>;
-  if (r?.error) return `Nao consegui: ${String(r.error)}`;
-  switch (toolName) {
-    case 'registrar_despesa':
-      return `Despesa registrada: ${r.description} - R$ ${Number(r.amount).toFixed(2)}.`;
-    case 'registrar_recebimento':
-      return `Recebimento registrado.`;
-    case 'cadastrar_cliente':
-      return `Cliente "${r.name}" cadastrado.`;
-    case 'resumo_vendas':
-      return `Vendas ${r.period}: ${r.count} venda(s), total R$ ${Number(r.gross).toFixed(2)} (recebido R$ ${Number(r.received).toFixed(2)}).`;
-    case 'total_a_receber':
-      return `Total a receber: R$ ${Number(r.total).toFixed(2)}.`;
-    case 'faturamento_mes':
-      return `Faturamento do mes: R$ ${Number(r.income).toFixed(2)} | Despesas: R$ ${Number(r.expense).toFixed(2)} | Saldo: R$ ${Number(r.net).toFixed(2)}.`;
-    case 'registrar_venda':
-      return `Venda #${r.number} registrada: total R$ ${Number(r.total).toFixed(2)}.`;
-    default:
-      return `Feito. ${JSON.stringify(result).slice(0, 500)}`;
-  }
+  const r = (result ?? {}) as Record<string, unknown>;
+  if (r.error) return `Nao consegui: ${String(r.error)}`;
+  if (r.needsClarification) return String(r.question);
+  if (r.needsConfirmation) return String(r.prompt);
+  if (typeof r.message === 'string') return r.message;
+  return `Feito. ${JSON.stringify(result).slice(0, 400)}`;
 }
 
 export class StubProvider implements AIProvider {
@@ -120,12 +107,10 @@ export class StubProvider implements AIProvider {
     }
 
     const toolCalls = detect(last?.content ?? '');
-    if (toolCalls.length > 0) {
-      return { content: '', toolCalls };
-    }
+    if (toolCalls.length > 0) return { content: '', toolCalls };
     return {
       content:
-        'Entendi sua mensagem, mas nao identifiquei uma acao clara. Reformule com o valor e a operacao (ex.: "registre uma despesa de 150 de combustivel").',
+        'Entendi sua mensagem, mas nao identifiquei uma acao clara. Diga o valor e a operacao (ex.: "paguei 120 de energia").',
       toolCalls: [],
     };
   }

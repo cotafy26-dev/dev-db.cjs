@@ -3,73 +3,56 @@ import { StubProvider } from '../src/ai/provider/stub';
 import type { ChatMessage } from '../src/ai/provider/types';
 
 const provider = new StubProvider();
+const user = (content: string): ChatMessage[] => [
+  { role: 'system', content: 'sys' },
+  { role: 'user', content },
+];
 
-function userMsg(content: string): ChatMessage[] {
-  return [
-    { role: 'system', content: 'sys' },
-    { role: 'user', content },
-  ];
-}
-
-describe('StubProvider - deteccao de intencao', () => {
-  it('despesa', async () => {
-    const res = await provider.chat({ messages: userMsg('Registre uma despesa de 150 reais de combustivel') });
-    expect(res.toolCalls[0]?.name).toBe('registrar_despesa');
-    const args = JSON.parse(res.toolCalls[0]!.arguments);
-    expect(args.amount).toBe(150);
+describe('StubProvider - intencoes PT-BR -> tools em ingles', () => {
+  it('venda: "Joao comprou 3 camisas por 80 reais cada e pagou no Pix"', async () => {
+    const res = await provider.chat({ messages: user('Joao comprou 3 camisas por 80 reais cada e pagou no Pix') });
+    expect(res.toolCalls[0]?.name).toBe('create_sale');
+    const a = JSON.parse(res.toolCalls[0]!.arguments);
+    expect(a.items[0].quantity).toBe(3);
+    expect(a.items[0].unitPrice).toBe(80);
+    expect(a.paymentMethod).toBe('PIX');
+    expect(a.customerName.toLowerCase()).toContain('joao');
   });
 
-  it('recebimento (X me pagou Y)', async () => {
-    const res = await provider.chat({ messages: userMsg('Joao me pagou 300 reais') });
-    expect(res.toolCalls[0]?.name).toBe('registrar_recebimento');
-    const args = JSON.parse(res.toolCalls[0]!.arguments);
-    expect(args.amount).toBe(300);
-    expect(args.customerName.toLowerCase()).toContain('joao');
+  it('despesa: "Paguei 120 reais de energia"', async () => {
+    const res = await provider.chat({ messages: user('Paguei 120 reais de energia') });
+    expect(res.toolCalls[0]?.name).toBe('create_expense');
+    expect(JSON.parse(res.toolCalls[0]!.arguments).amount).toBe(120);
   });
 
-  it('cadastro de cliente', async () => {
-    const res = await provider.chat({ messages: userMsg('Cadastre Maria como cliente') });
-    expect(res.toolCalls[0]?.name).toBe('cadastrar_cliente');
+  it('recebimento: "Joao me pagou 300"', async () => {
+    const res = await provider.chat({ messages: user('Joao me pagou 300') });
+    expect(res.toolCalls[0]?.name).toBe('register_payment');
+    expect(JSON.parse(res.toolCalls[0]!.arguments).amount).toBe(300);
   });
 
-  it('quanto vendi hoje', async () => {
-    const res = await provider.chat({ messages: userMsg('Quanto vendi hoje?') });
-    expect(res.toolCalls[0]?.name).toBe('resumo_vendas');
-    expect(JSON.parse(res.toolCalls[0]!.arguments).period).toBe('hoje');
+  it('cliente / vendas / receber / devedores / estoque', async () => {
+    expect((await provider.chat({ messages: user('Cadastre Maria como cliente') })).toolCalls[0]?.name).toBe('create_customer');
+    expect((await provider.chat({ messages: user('Quanto vendi hoje?') })).toolCalls[0]?.name).toBe('sales_summary');
+    expect((await provider.chat({ messages: user('Quanto tenho para receber?') })).toolCalls[0]?.name).toBe('get_receivables');
+    expect((await provider.chat({ messages: user('Quem esta devendo?') })).toolCalls[0]?.name).toBe('list_overdue_customers');
+    expect((await provider.chat({ messages: user('Quais produtos estao acabando?') })).toolCalls[0]?.name).toBe('low_stock_products');
   });
 
-  it('a receber / devedores / vencimentos / estoque', async () => {
-    expect((await provider.chat({ messages: userMsg('Quanto tenho para receber?') })).toolCalls[0]?.name).toBe('total_a_receber');
-    expect((await provider.chat({ messages: userMsg('Quem esta devendo?') })).toolCalls[0]?.name).toBe('lista_devedores');
-    expect((await provider.chat({ messages: userMsg('Quais contas vencem amanha?') })).toolCalls[0]?.name).toBe('contas_a_vencer');
-    expect((await provider.chat({ messages: userMsg('Quais produtos estao acabando?') })).toolCalls[0]?.name).toBe('produtos_estoque_baixo');
-  });
-
-  it('venda com pix', async () => {
-    const res = await provider.chat({
-      messages: userMsg('Registre uma venda de 2 camisas por 80 reais para Joao no Pix'),
-    });
-    expect(res.toolCalls[0]?.name).toBe('registrar_venda');
-    const args = JSON.parse(res.toolCalls[0]!.arguments);
-    expect(args.items[0].quantity).toBe(2);
-    expect(args.items[0].unitPrice).toBe(80);
-    expect(args.paymentMethod).toBe('PIX');
-  });
-
-  it('resume o resultado de uma tool', async () => {
+  it('resume o resultado de uma tool a partir de result.message', async () => {
     const res = await provider.chat({
       messages: [
         { role: 'user', content: 'Quanto tenho para receber?' },
-        { role: 'assistant', content: '', toolCalls: [{ id: 't1', name: 'total_a_receber', arguments: '{}' }] },
-        { role: 'tool', content: JSON.stringify({ total: 450 }), toolCallId: 't1' },
+        { role: 'assistant', content: '', toolCalls: [{ id: 't1', name: 'get_receivables', arguments: '{}' }] },
+        { role: 'tool', content: JSON.stringify({ total: 4850, overdue: 950, message: 'Voce possui R$ 4.850,00 para receber.' }), toolCallId: 't1' },
       ],
     });
     expect(res.toolCalls).toHaveLength(0);
-    expect(res.content).toContain('450');
+    expect(res.content).toContain('4.850');
   });
 
   it('mensagem sem acao', async () => {
-    const res = await provider.chat({ messages: userMsg('bom dia') });
+    const res = await provider.chat({ messages: user('bom dia') });
     expect(res.toolCalls).toHaveLength(0);
     expect(res.content.length).toBeGreaterThan(0);
   });
