@@ -36,7 +36,9 @@ const schema = z.object({
   JWT_ACCESS_TTL: z.string().default('15m'),
   JWT_REFRESH_TTL: z.string().default('30d'),
 
-  AI_PROVIDER: z.enum(['ollama', 'openai', 'openrouter', 'together', 'vllm', 'stub']).default('ollama'),
+  AI_PROVIDER: z
+    .enum(['ollama', 'openai', 'openrouter', 'groq', 'gemini', 'together', 'cerebras', 'vllm', 'stub'])
+    .default('ollama'),
   AI_BASE_URL: z.string().default('http://localhost:11434/v1'),
   AI_API_KEY: z.string().default('ollama'),
   AI_MODEL: z.string().default('hermes3:8b'),
