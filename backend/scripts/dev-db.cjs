@@ -4,8 +4,18 @@
  *   node backend/scripts/dev-db.cjs
  * Dados persistem em backend/.dev-postgres (gitignored).
  */
-const mod = require('embedded-postgres');
-const EmbeddedPostgres = mod.default || mod;
+let EmbeddedPostgres;
+try {
+  const mod = require('embedded-postgres');
+  EmbeddedPostgres = mod.default || mod;
+} catch {
+  console.error(
+    '[dev-db] pacote "embedded-postgres" nao instalado.\n' +
+      '        Rode: npm i -D embedded-postgres   (so para o Postgres local de dev)\n' +
+      '        Ou use um DATABASE_URL externo (Supabase) direto no backend/.env.',
+  );
+  process.exit(1);
+}
 const fs = require('node:fs');
 const path = require('node:path');
 
