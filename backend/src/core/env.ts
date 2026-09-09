@@ -15,7 +15,12 @@ if (JWT_FALLBACK) {
 
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  PORT: z.coerce.number().int().positive().default(3333),
+  // Aceita a PORT do host (Hostinger/Render/etc.); se vier vazia/invalida, cai em 3000.
+  PORT: z.preprocess((v) => {
+    const n = Number(v);
+    return Number.isFinite(n) && n > 0 ? n : undefined;
+  }, z.number().int().positive().default(3000)),
+  HOST: z.string().default('0.0.0.0'),
   WEB_ORIGIN: z.string().default('http://localhost:5173'),
   APP_URL: z.string().default('http://localhost:5173'),
   API_URL: z.string().default('http://localhost:3333'),

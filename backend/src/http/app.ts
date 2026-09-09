@@ -45,7 +45,11 @@ export function createApp(): Express {
   app.use('/api/auth/login', authLimiter);
   app.use('/api/auth/register', authLimiter);
 
+  app.get('/', (_req, res) =>
+    res.json({ name: 'HERMES IA API', status: 'up', health: '/api/health', docs: '/api' }),
+  );
   app.get('/health', (_req, res) => res.json({ status: 'ok', ts: new Date().toISOString() }));
+  app.head('/', (_req, res) => res.sendStatus(200));
   app.use('/api', apiRouter);
 
   app.use(notFoundHandler);
