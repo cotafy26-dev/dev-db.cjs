@@ -1,0 +1,53 @@
+# Deploy 1-clique no Render (alternativa sem VPS). https://render.com/deploy
+# Backend = Web Service Node · Frontend = Static Site · Banco = Supabase (externo)
+
+services:
+  - type: web
+    name: hermes-api
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run db:generate && npm run build --workspace backend
+    startCommand: npm run db:deploy && npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL          # cole a connection string do Supabase (Session pooler)
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: WEB_ORIGIN            # https://app.seudominio.com
+        sync: false
+      - key: APP_URL
+        sync: false
+      - key: API_URL              # a propria URL deste servico
+        sync: false
+      - key: AI_PROVIDER
+        value: stub
+      - key: AI_BASE_URL
+        value: https://openrouter.ai/api/v1
+      - key: AI_API_KEY
+        sync: false
+      - key: AI_MODEL
+        value: nousresearch/hermes-3-llama-3.1-70b
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_MODE
+        value: webhook
+      - key: TELEGRAM_WEBHOOK_URL  # a URL deste servico (ex.: https://hermes-api.onrender.com)
+        sync: false
+      - key: CRON_SECRET
+        generateValue: true
+
+  - type: web
+    name: hermes-web
+    runtime: static
+    buildCommand: npm ci && npm run build --workspace frontend
+    staticPublishPath: frontend/dist
+    envVars:
+      - key: VITE_API_URL          # URL do hermes-api
+        sync: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

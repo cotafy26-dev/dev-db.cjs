@@ -1,8 +1,13 @@
 import axios, { AxiosError } from 'axios';
 import { authStore } from '../stores/auth';
 
+// Em dev: '/api' (proxy do Vite). Em producao com frontend estatico em outro
+// dominio: defina VITE_API_URL=https://sua-api no build.
+const RAW = import.meta.env.VITE_API_URL?.replace(/\/$/, '') ?? '';
+export const API_BASE = RAW ? `${RAW}/api` : '/api';
+
 export const api = axios.create({
-  baseURL: '/api',
+  baseURL: API_BASE,
   headers: { 'Content-Type': 'application/json' },
 });
 
@@ -18,7 +23,7 @@ async function refreshAccessToken(): Promise<string | null> {
   const { tokens, setTokens, clear } = authStore.getState();
   if (!tokens?.refreshToken) return null;
   try {
-    const res = await axios.post('/api/auth/refresh', { refreshToken: tokens.refreshToken });
+    const res = await axios.post(`${API_BASE}/auth/refresh`, { refreshToken: tokens.refreshToken });
     const next = res.data.data.tokens;
     setTokens(next);
     return next.accessToken as string;

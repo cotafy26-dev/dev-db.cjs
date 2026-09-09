@@ -67,6 +67,13 @@ export const prisma = basePrisma.$extends({
 
 export type AppPrisma = typeof prisma;
 
+/**
+ * Client SEM a guarda de tenant. Uso restrito a operacoes de infraestrutura
+ * legitimamente cross-tenant (ex.: scan de automacoes agendadas de todas as
+ * empresas). NUNCA usar em fluxo de request de usuario.
+ */
+export const systemPrisma = basePrisma;
+
 export async function connectDatabase(): Promise<void> {
   await basePrisma.$connect();
   logger.info('Banco de dados conectado');

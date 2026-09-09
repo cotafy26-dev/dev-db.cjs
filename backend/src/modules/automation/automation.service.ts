@@ -1,4 +1,4 @@
-import { prisma } from '../../core/prisma';
+import { prisma, systemPrisma } from '../../core/prisma';
 import { logger } from '../../core/logger';
 import { NotFoundError } from '../../core/errors';
 import { currentCompanyId, currentUserId, runWithContext } from '../../core/context';
@@ -109,25 +109,28 @@ async function executeAction(action: string): Promise<void> {
 
 /** Dispara automacoes de um trigger para uma empresa (chamado por eventos ou pelo scheduler). */
 export async function fireTrigger(companyId: string, trigger: string): Promise<void> {
-  const automations = await prisma.automation.findMany({ where: { companyId, trigger, active: true } });
-  for (const a of automations) {
-    try {
-      await runWithContext(
-        { companyId, userId: null, role: 'ADMIN', source: 'system', requestId: `auto-${a.id}` },
-        async () => {
+  await runWithContext(
+    { companyId, userId: null, role: 'ADMIN', source: 'system', requestId: `auto-${companyId}` },
+    async () => {
+      const automations = await prisma.automation.findMany({
+        where: { companyId, trigger, active: true },
+      });
+      for (const a of automations) {
+        try {
           await executeAction(a.action);
           await prisma.automation.update({ where: { id: a.id }, data: { lastRunAt: new Date() } });
-        },
-      );
-    } catch (err) {
-      logger.error({ err, automationId: a.id }, 'Falha ao executar automacao');
-    }
-  }
+        } catch (err) {
+          logger.error({ err, automationId: a.id }, 'Falha ao executar automacao');
+        }
+      }
+    },
+  );
 }
 
 /** Tick do scheduler (secao 25/35). Percorre empresas com automacoes agendadas. */
 export async function runScheduledAutomations(kind: 'schedule.daily' | 'schedule.weekly'): Promise<void> {
-  const rows = await prisma.automation.findMany({
+  // Scan cross-tenant: usa o client de sistema (sem guarda de tenant).
+  const rows = await systemPrisma.automation.findMany({
     where: { trigger: kind, active: true },
     select: { companyId: true },
     distinct: ['companyId'],

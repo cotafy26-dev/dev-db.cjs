@@ -22,6 +22,8 @@ const schema = z.object({
 
   DATABASE_URL: z.string().min(1, 'DATABASE_URL e obrigatorio'),
   REDIS_URL: z.string().optional().default(''),
+  // Segredo para o endpoint /api/cron/tick (cron externo dispara automacoes agendadas).
+  CRON_SECRET: z.string().optional().default(''),
 
   JWT_SECRET: z.string().optional().default(''),
   JWT_ACCESS_SECRET: z.string().min(16, 'Defina JWT_SECRET ou JWT_ACCESS_SECRET (>= 16 chars)'),

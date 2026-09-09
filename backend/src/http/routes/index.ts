@@ -20,6 +20,7 @@ import { integrationsSettingsRouter } from '../../modules/integrations/integrati
 import { aiRouter } from '../../ai/ai.controller';
 import { channelsRouter } from '../../integrations/channels.controller';
 import { webhooksRouter } from '../../integrations/webhooks.controller';
+import { cronRouter } from './cron';
 
 export const apiRouter = Router();
 
@@ -36,6 +37,7 @@ apiRouter.get('/health', async (_req, res, next) => {
 apiRouter.use('/auth', authRouter);
 apiRouter.use('/webhooks', webhooksRouter);
 apiRouter.use('/integrations', webhooksRouter); // alias
+apiRouter.use('/cron', cronRouter); // protegido por CRON_SECRET
 
 // Autenticados (multi-tenant + RBAC)
 apiRouter.use('/companies', authenticate, companyRouter);

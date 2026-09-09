@@ -267,13 +267,18 @@ Mais detalhes: [`docs/architecture.md`](docs/architecture.md) e [`docs/api.md`](
 
 ## Produção
 
-- Rode `npm run build` e sirva `backend` com `npm start` (aplica migrations com
-  `npm run db:deploy` no deploy) e `frontend/dist` por um CDN/nginx.
-- Ou use `docker compose` (imagens multi-stage já incluídas).
-- Defina `NODE_ENV=production`, segredos fortes, `TELEGRAM_MODE=webhook` +
-  `TELEGRAM_WEBHOOK_URL`, e `WEB_ORIGIN`/`APP_URL` reais.
-- Logs estruturados (pino) sem senhas/tokens. Erros padronizados; nunca stack trace
-  para o cliente.
+Passo a passo completo (hosting sem VPS, PaaS, Telegram webhook, cron externo):
+**[`docs/DEPLOY.md`](docs/DEPLOY.md)**.
+
+Resumo:
+- **Banco:** Supabase — `npm run db:deploy` a cada migration.
+- **Frontend:** `VITE_API_URL=https://api... npm run build --workspace frontend` → sobe
+  `frontend/dist/` (o `.htaccess`/`_redirects` de SPA já vão junto).
+- **Backend:** hosting com "Setup Node.js App" **ou** PaaS (Render/Railway/Fly). Há
+  [`render.yaml`](render.yaml) e `Procfile` prontos.
+- `NODE_ENV=production`, `JWT_SECRET` forte, `WEB_ORIGIN` = domínio do front,
+  `TELEGRAM_MODE=webhook` + `TELEGRAM_WEBHOOK_URL`, `CRON_SECRET` para `/api/cron/tick`.
+- Logs estruturados (pino) sem senhas/tokens; erros padronizados; nunca stack trace ao cliente.
 
 ---
 
