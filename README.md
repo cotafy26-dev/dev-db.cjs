@@ -76,9 +76,8 @@ npm install
 npm run db:generate          # gera o Prisma Client (o ambiente pode bloquear o postinstall)
 
 # 2. Configuração
-cp .env.example .env
-#   edite .env: cole a DATABASE_URL e gere o JWT_SECRET:
-#   node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+cp .env.example .env         # edite: DATABASE_URL + JWT_SECRET
+#   JWT_SECRET: node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 
 # 3. Banco
 npm run db:migrate           # cria as tabelas
@@ -87,6 +86,19 @@ npm run db:seed              # empresa demo + 3 usuários
 # 4. Subir (um terminal só)
 npm run dev                  # API :3333  +  painel :5173
 #   ou separados:  npm run dev:backend   /   npm run dev:frontend
+```
+
+### Sem PostgreSQL instalado? Postgres embarcado (dev)
+
+Não precisa de Docker nem instalação. Um Postgres real é baixado e roda em
+`localhost:5433`, com dados em `backend/.dev-postgres/`:
+
+```bash
+npm run dev:db     # terminal 1 — deixa rodando
+# backend/.env já pode apontar para:
+#   DATABASE_URL=postgresql://hermes:hermes@localhost:5433/hermes?schema=public
+npm run db:migrate && npm run db:seed   # terminal 2 (uma vez)
+npm run dev                              # terminal 2 — API + painel
 ```
 
 **Login demo** (após `db:seed`):

@@ -36,3 +36,6 @@ coverage/
 # runtime
 *.pid
 .cache/
+
+# embedded postgres (dev)
+backend/.dev-postgres/
