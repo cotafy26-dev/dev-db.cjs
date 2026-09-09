@@ -53,6 +53,29 @@ export class WhatsAppProvider implements MessagingProvider {
     return this.post({ to, type: 'document', document: { link: url, filename: filename ?? 'documento' } });
   }
 
+  /** Upload de mídia + envio como mensagem de áudio (voz). */
+  async sendVoice(to: string, audio: Buffer, mime = 'audio/ogg') {
+    if (!this.isEnabled()) return { ok: false, error: 'WhatsApp desativado' };
+    try {
+      const base = env.WHATSAPP_API_URL.replace(/\/$/, '');
+      const form = new FormData();
+      form.append('messaging_product', 'whatsapp');
+      form.append('type', mime);
+      form.append('file', new Blob([audio], { type: mime }), 'resposta.ogg');
+      const up = await fetch(`${base}/${env.WHATSAPP_PHONE_NUMBER_ID}/media`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${env.WHATSAPP_API_TOKEN}` },
+        body: form,
+      });
+      const upJson = (await up.json()) as { id?: string };
+      if (!upJson.id) return { ok: false, error: 'upload de audio falhou' };
+      return this.post({ to, type: 'audio', audio: { id: upJson.id } });
+    } catch (err) {
+      logger.warn({ err }, 'WhatsApp sendVoice falhou');
+      return { ok: false, error: err instanceof Error ? err.message : 'erro' };
+    }
+  }
+
   async sendTemplate(to: string, name: string, params: string[]) {
     return this.post({
       to,

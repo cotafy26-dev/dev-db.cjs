@@ -27,4 +27,5 @@ export interface MessagingProvider {
   sendMedia?(to: string, url: string, caption?: string): Promise<{ ok: boolean; error?: string }>;
   sendDocument?(to: string, url: string, filename?: string): Promise<{ ok: boolean; error?: string }>;
   sendTemplate?(to: string, name: string, params: string[]): Promise<{ ok: boolean; error?: string }>;
+  sendVoice?(to: string, audio: Buffer, mime?: string): Promise<{ ok: boolean; error?: string }>;
 }

@@ -48,6 +48,19 @@ const schema = z.object({
   AI_HISTORY_MESSAGES: z.coerce.number().int().positive().max(60).default(14),
   AI_RATE_PER_MIN: z.coerce.number().int().positive().default(20),
 
+  // ---- Audio: transcricao (STT) e voz (TTS) nos canais ----
+  STT_ENABLED: z.enum(['true', 'false']).default('true').transform((v) => v === 'true'),
+  STT_BASE_URL: z.string().optional().default(''), // vazio = usa AI_BASE_URL
+  STT_API_KEY: z.string().optional().default(''), // vazio = usa AI_API_KEY
+  STT_MODEL: z.string().default('whisper-large-v3-turbo'),
+  STT_MAX_MB: z.coerce.number().positive().default(20),
+  TTS_ENABLED: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
+  TTS_PROVIDER: z.enum(['openai', 'elevenlabs']).default('openai'),
+  TTS_BASE_URL: z.string().optional().default(''),
+  TTS_API_KEY: z.string().optional().default(''),
+  TTS_MODEL: z.string().optional().default(''),
+  TTS_VOICE: z.string().optional().default(''),
+
   TELEGRAM_BOT_TOKEN: z.string().optional().default(''),
   TELEGRAM_WEBHOOK_URL: z.string().optional().default(''),
   TELEGRAM_MODE: z.enum(['polling', 'webhook', 'off']).default('polling'),
